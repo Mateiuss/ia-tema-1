@@ -1,5 +1,5 @@
 import utils
-from copy import copy
+from copy import copy, deepcopy
 
 class Interval:
     def __init__(self, interval: str):
@@ -72,95 +72,13 @@ class Sala:
     
 class State:
     def __init__(self, orar: dict=None, conflicts: int=0):
-        if orar is None:
-            self.orar = self.create_initial_state()
-        else:
-            self.orar = orar
-
-        self.conflicts = conflicts
-        self.compute_conflicts()
+        pass
 
     def create_initial_state(self):
-        profesori.sort(key=lambda x: len(x.materii))
-        sali.sort(key=lambda x: (x.capacitate, -len(x.materii)), reverse=True)
-        materii.sort(key=lambda x: x.capacitate, reverse=True)
-        
-        orar = {}
-        for zi in zile:
-            orar[zi] = {}
-            
-            for interval in intervale:
-                orar[zi][interval.get_interval()] = {}
-                
-                for sala in sali:
-                    orar[zi][interval.get_interval()][sala.get_name()] = None
-
-        for materie in materii:
-            capacitate_curenta = 0
-            materie_out = False
-
-            for profesor in profesori:
-                if not profesor.in_materii(materie.get_name()):
-                    continue
-
-                profesor_out = False
-
-                for zi in zile:
-                    for interval in intervale:
-                        for sala in sali:
-                            if not sala.in_materii(materie.get_name()):
-                                continue
-
-                            if orar[zi][interval.get_interval()][sala.get_name()] is not None:
-                                continue
-
-                            if profesor.get_ore_predate() == 7:
-                                profesor_out = True
-                                break
-
-                            if capacitate_curenta >= materie.get_capacitate():
-                                materie_out = True
-                                break
-
-                            orar[zi][interval.get_interval()][sala.get_name()] = (profesor.get_name(), materie)
-                            profesor.inc_ore_predate()
-                            capacitate_curenta += sala.get_capacitate()
-
-                            break
-                        if profesor_out or materie_out:
-                            break
-
-                    if profesor_out or materie_out:
-                        break
-
-        # print(utils.pretty_print_timetable(orar, 'inputs/dummy.yaml'))
-
-        return orar
+        pass
     
     def compute_conflicts(self):
-        self.conflicts = 0
-
-        for zi in zile:
-            for interval in intervale:
-                for sala in sali:
-                    if self.orar[zi][interval.get_interval()][sala.get_name()] is None:
-                        continue
-
-                    prof, _ = self.orar[zi][interval.get_interval()][sala.get_name()]
-                    prof = [profesor for profesor in profesori if profesor.get_name() == prof][0]
-
-                    for constrangere in prof.constrangeri:
-                        if constrangere in zile:
-                            if constrangere != zi:
-                                self.conflicts += 1
-                        elif constrangere[0] == '!':
-                            if constrangere[1:] == zi:
-                                self.conflicts += 1
-                            elif constrangere[1:] == str(interval.start) + '-' + str(interval.end):
-                                self.conflicts += 1
-                        else:
-                            if constrangere != str(interval.start) + '-' + str(interval.end):
-                                self.conflicts += 1
+        pass
         
     def get_conflicts(self) -> int:
         return self.conflicts
@@ -169,50 +87,10 @@ class State:
         return self.conflicts == 0
     
     def apply_move(self, old_pos: tuple, value: tuple, new_pos: tuple):
-        prof, materie = value
-        old_zi, old_interval, old_sala = old_pos
-        new_zi, new_interval, new_sala = new_pos
-
-        new_orar = self.orar.copy()
-        new_orar[new_zi] = new_orar[new_zi].copy()
-        new_orar[new_zi][new_interval] = new_orar[new_zi][new_interval].copy()
-        new_orar[new_zi][new_interval][new_sala] = (prof, materie)
-
-        new_orar[old_zi] = new_orar[old_zi].copy()
-        new_orar[old_zi][old_interval] = new_orar[old_zi][old_interval].copy()
-        new_orar[old_zi][old_interval][old_sala] = None
-
-        return State(new_orar)
+        pass
     
     def get_next_states(self):
-        for zi in zile:
-            for interval in intervale:
-                for sala in sali:
-                    if self.orar[zi][interval.get_interval()][sala.get_name()] is None:
-                        continue
-
-                    prof, materie = self.orar[zi][interval.get_interval()][sala.get_name()]
-                    prof = [profesor for profesor in profesori if profesor.get_name() == prof][0]
-
-                    for zi_noua in zile:
-                        for interval_nou in intervale:
-                            for sala_noua in sali:
-                                if zi_noua == zi and interval_nou.get_interval() == interval.get_interval() and sala_noua.get_name() == sala.get_name():
-                                    continue
-
-                                if self.orar[zi_noua][interval_nou.get_interval()][sala_noua.get_name()] is not None:
-                                    continue
-
-                                if not sala_noua.in_materii(materie.get_name()):
-                                    continue
-
-                                if not prof.in_materii(materie.get_name()):
-                                    continue
-
-                                yield self.apply_move(\
-                                                    (zi, interval.get_interval(), sala.get_name()), \
-                                                    (prof.get_name(), materie), \
-                                                    (zi_noua, interval_nou.get_interval(), sala_noua.get_name()))
+        pass
                                 
     def get_orar(self) -> dict:
         return self.orar
@@ -221,8 +99,10 @@ class State:
         return State(copy(self.orar), self.conflicts)
 
 
-def hca_main(timetable_specs: dict):
+def hca_main(timetable_specs: dict, input_file: str):
     global materii, profesori, sali, intervale, zile
+
+    zile = timetable_specs[utils.ZILE]
 
     materii = []
     for materie, capacitate in timetable_specs[utils.MATERII].items():
@@ -240,10 +120,6 @@ def hca_main(timetable_specs: dict):
     for interval in timetable_specs[utils.INTERVALE]:
         intervale.append(Interval(interval))
 
-    zile = timetable_specs[utils.ZILE]
-
-    result = hill_climbing(State(), 1000).get_orar()
-    print(utils.pretty_print_timetable(result, 'inputs/dummy.yaml'))
 
 def hill_climbing(initial: State, max_iters: int = 1000):
     iters, states = 0, 0
@@ -251,7 +127,6 @@ def hill_climbing(initial: State, max_iters: int = 1000):
     minim = state.get_conflicts()
     
     while iters < max_iters:
-        print(minim, states)
         iters += 1
         minim = state.get_conflicts()
 
@@ -272,4 +147,4 @@ def hill_climbing(initial: State, max_iters: int = 1000):
         if not_found:
             break
         
-    return state
+    return state.is_final(), iters, states, state

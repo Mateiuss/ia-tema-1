@@ -15,7 +15,7 @@ if __name__ == '__main__':
     timetable_specs = utils.read_yaml_file(input_file)
 
     if method == 'hc':
-        hca.hca_main(timetable_specs)
+        hca.hca_main(timetable_specs, input_file)
     elif method == 'csp':
         pass
     else:
