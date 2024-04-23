@@ -1,3 +1,4 @@
+import random
 import utils
 from copy import copy, deepcopy
 
@@ -65,7 +66,12 @@ class State:
         if orar is None:
             self.orar = self.create_empty_orar()
         else:
+            # print(utils.pretty_print_timetable(orar, 'inputs/dummy.yaml'))
             self.orar = orar
+
+        self.compute_conflicts()
+
+        print(self.hard_conflicts)
 
     def create_empty_orar(self):
         orar = {}
@@ -85,7 +91,10 @@ class State:
 
         profesor_zi_interval = {}
         profesor_ore_predate = {}
+
         materie_acoperire = {}
+        for materie in materii:
+            materie_acoperire[materie] = 0
 
         for zi in self.orar:
             for interval in self.orar[zi]:
@@ -117,10 +126,7 @@ class State:
                         self.hard_conflicts += 1
 
                     # Hard constraint 5
-                    if materie not in materie_acoperire:
-                        materie_acoperire[materie] = sali[sala].get_capacitate()
-                    else:
-                        materie_acoperire[materie] += sali[sala].get_capacitate()
+                    materie_acoperire[materie] += sali[sala].get_capacitate()
 
                     # Hard constraint 6
                     if not profesori[profesor].in_materii(materie):
@@ -142,16 +148,64 @@ class State:
         return self.hard_conflicts == 0 and self.soft_conflicts == 0
     
     def apply_move(self, old_pos: tuple, value: tuple, new_pos: tuple):
-        pass
+        old_zi, old_interval, old_sala = old_pos
+        new_zi, new_interval, new_sala = new_pos
+
+        new_orar = deepcopy(self.orar)
+        new_orar[old_zi][old_interval][old_sala] = None
+        new_orar[new_zi][new_interval][new_sala] = value
+
+        return State(new_orar)
     
     def get_next_states(self):
-        pass
+        """
+        Generator function that yields all possible states that can be reached
+        from the current state
+        """
+
+        for zi in zile:
+            for interval in intervale:
+                interval = intervale[interval].get_interval()
+
+                for sala in sali:
+                    if self.orar[zi][interval][sala] is not None:
+                        continue
+
+                    for profesor in profesori:
+                        for materie in profesori[profesor].materii:
+                            if self.orar[zi][interval][sala] is not None:
+                                continue
+
+                            if not sali[sala].in_materii(materie):
+                                continue
+
+                            if not profesori[profesor].in_materii(materie):
+                                continue
+
+                            yield self.apply_move((zi, interval, sala), (profesor, materie), (zi, interval, sala))
                                 
     def get_orar(self) -> dict:
         return self.orar
     
     def clone(self):
         return State(deepcopy(self.orar))
+    
+def stochastic_hill_climbing(initial: State, max_iters: int = 1000):
+    iters, states = 0, 0
+    state = initial.clone()
+    
+    while iters < max_iters:
+        iters += 1
+        state_conflicts, _ = state.get_conflicts()
+
+        lista = [x for x in list(state.get_next_states()) if state_conflicts >= x.get_conflicts()[0]]
+
+        if len(lista) == 0 or state.is_final():
+            break
+
+        state = random.choice(lista)
+
+    return state.is_final(), iters, states, state
 
 def hca_main(timetable_specs: dict, input_path: str):
     global materii, sali, profesori, zile, intervale
@@ -178,6 +232,8 @@ def hca_main(timetable_specs: dict, input_path: str):
         
     zile = timetable_specs[utils.ZILE]
         
-    state = State()
+    _, _, _, state = stochastic_hill_climbing(State(), 1000)
 
-    print(utils.pretty_print_timetable(state.get_orar(), input_path))
+    output_path = input_path.replace('inputs', 'my_outputs').replace('.yaml', '.txt')
+    with open(output_path, 'w') as f:
+        f.write(utils.pretty_print_timetable(state.get_orar(), input_path))
