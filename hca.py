@@ -32,13 +32,27 @@ class Profesor:
     def __init__(self, name: str, materii: list, constrangeri: list):
         self.name = name
         self.materii = set(materii)
-        self.constrangeri = set(constrangeri)
+        self.constrangeri = [x[1:] for x in constrangeri if x[0] == '!']
+        
+        new_constrangeri = []
+        for constrangere in self.constrangeri:
+            if '-' in constrangere:
+                start, end = constrangere.split('-')
+                start, end = int(start), int(end)
+                new_constrangeri += [str(x) + '-' + str(x + 2) for x in range(start, end, 2)]
+            else:
+                new_constrangeri.append(constrangere)
+
+        self.constrangeri = new_constrangeri
 
     def get_name(self) -> str:
         return self.name
     
     def in_materii(self, materie: str) -> bool:
         return materie in self.materii
+    
+    def in_constrangeri(self, constrangere: str) -> bool:
+        return constrangere in self.constrangeri
     
     def __str__(self) -> str:
         return self.name + ' ' + str(self.materii)
@@ -66,12 +80,9 @@ class State:
         if orar is None:
             self.orar = self.create_empty_orar()
         else:
-            # print(utils.pretty_print_timetable(orar, 'inputs/dummy.yaml'))
             self.orar = orar
 
         self.compute_conflicts()
-
-        print(self.hard_conflicts)
 
     def create_empty_orar(self):
         orar = {}
@@ -135,6 +146,15 @@ class State:
                     # Hard constraint 7
                     if not sali[sala].in_materii(materie):
                         self.hard_conflicts += 1
+
+                    # Soft constraint interval
+                    string_interval = str(interval[0]) + '-' + str(interval[1])
+                    if profesori[profesor].in_constrangeri(string_interval):
+                        self.soft_conflicts += 1
+
+                    # Soft constraint zi
+                    if profesori[profesor].in_constrangeri(f'{zi}'):
+                        self.soft_conflicts += 1
 
         # Hard constraint 5
         for materie in materie_acoperire:
@@ -233,7 +253,10 @@ def hca_main(timetable_specs: dict, input_path: str):
     zile = timetable_specs[utils.ZILE]
         
     _, _, _, state = stochastic_hill_climbing(State(), 1000)
+    timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
+    print(state.hard_conflicts, state.soft_conflicts)
+    print(timetable)
 
     output_path = input_path.replace('inputs', 'my_outputs').replace('.yaml', '.txt')
     with open(output_path, 'w') as f:
-        f.write(utils.pretty_print_timetable(state.get_orar(), input_path))
+        f.write(timetable)
