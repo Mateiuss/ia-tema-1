@@ -216,9 +216,10 @@ def stochastic_hill_climbing(initial: State, max_iters: int = 1000):
     
     while iters < max_iters:
         iters += 1
-        state_conflicts, _ = state.get_conflicts()
+        h_conflicts, s_conflicts = state.get_conflicts()
+        conflicts = h_conflicts + s_conflicts
 
-        lista = [x for x in list(state.get_next_states()) if state_conflicts >= x.get_conflicts()[0]]
+        lista = [x for x in list(state.get_next_states()) if conflicts >= x.get_conflicts()[0] + x.get_conflicts()[1]]
 
         if len(lista) == 0 or state.is_final():
             break
