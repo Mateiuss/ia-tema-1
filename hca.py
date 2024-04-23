@@ -32,7 +32,6 @@ class Profesor:
         self.name = name
         self.materii = set(materii)
         self.constrangeri = set(constrangeri)
-        self.ore_predate = 0
 
     def get_name(self) -> str:
         return self.name
@@ -40,17 +39,8 @@ class Profesor:
     def in_materii(self, materie: str) -> bool:
         return materie in self.materii
     
-    def in_constrangeri(self, materie: str) -> bool:
-        return materie in self.constrangeri
-    
-    def get_ore_predate(self) -> int:
-        return self.ore_predate
-    
-    def inc_ore_predate(self):
-        self.ore_predate += 1
-    
     def __str__(self) -> str:
-        return self.name + ' ' + str(self.materii) + ' ' + str(self.constrangeri)
+        return self.name + ' ' + str(self.materii)
     
 class Sala:
     def __init__(self, name: str, capacitate: int, materii: list):
@@ -71,20 +61,85 @@ class Sala:
         return self.name + ' ' + str(self.capacitate) + ' ' + str(self.materii)
     
 class State:
-    def __init__(self, orar: dict=None, conflicts: int=0):
-        pass
+    def __init__(self, orar: dict=None):
+        if orar is None:
+            self.orar = self.create_empty_orar()
+        else:
+            self.orar = orar
 
-    def create_initial_state(self):
-        pass
+    def create_empty_orar(self):
+        orar = {}
+
+        for zi in zile:
+            orar[zi] = {}
+            for _, interval_obj in intervale.items():
+                orar[zi][interval_obj.get_interval()] = {}
+                for _, sala_obj in sali.items():
+                    orar[zi][interval_obj.get_interval()][sala_obj.get_name()] = None
+
+        return orar
     
     def compute_conflicts(self):
-        pass
+        self.hard_conflicts = 0
+        self.soft_conflicts = 0
+
+        profesor_zi_interval = {}
+        profesor_ore_predate = {}
+        materie_acoperire = {}
+
+        for zi in self.orar:
+            for interval in self.orar[zi]:
+                for sala in self.orar[zi][interval]:
+                    if self.orar[zi][interval][sala] is None:
+                        continue
+
+                    profesor, materie = self.orar[zi][interval][sala]
+
+                    # Hard constraint 2
+                    if profesor not in profesor_zi_interval:
+                        profesor_zi_interval[profesor] = {}
+
+                    if zi not in profesor_zi_interval[profesor]:
+                        profesor_zi_interval[profesor][zi] = set()
+
+                    if interval in profesor_zi_interval[profesor][zi]:
+                        self.hard_conflicts += 1
+                    else:
+                        profesor_zi_interval[profesor][zi].add(interval)
+
+                    # Hard constraint 3
+                    if profesor not in profesor_ore_predate:
+                        profesor_ore_predate[profesor] = 1
+                    else:
+                        profesor_ore_predate[profesor] += 1
+
+                    if profesor_ore_predate[profesor] == 8:
+                        self.hard_conflicts += 1
+
+                    # Hard constraint 5
+                    if materie not in materie_acoperire:
+                        materie_acoperire[materie] = sali[sala].get_capacitate()
+                    else:
+                        materie_acoperire[materie] += sali[sala].get_capacitate()
+
+                    # Hard constraint 6
+                    if not profesori[profesor].in_materii(materie):
+                        self.hard_conflicts += 1
+
+                    # Hard constraint 7
+                    if not sali[sala].in_materii(materie):
+                        self.hard_conflicts += 1
+
+        # Hard constraint 5
+        for materie in materie_acoperire:
+            if materie_acoperire[materie] < materii[materie].get_capacitate():
+                self.hard_conflicts += 1
         
     def get_conflicts(self) -> int:
-        return self.conflicts
+        return (self.hard_conflicts, self.soft_conflicts)
     
     def is_final(self) -> bool:
-        return self.conflicts == 0
+        return self.hard_conflicts == 0 and self.soft_conflicts == 0
     
     def apply_move(self, old_pos: tuple, value: tuple, new_pos: tuple):
         pass
@@ -96,55 +151,33 @@ class State:
         return self.orar
     
     def clone(self):
-        return State(copy(self.orar), self.conflicts)
+        return State(deepcopy(self.orar))
 
+def hca_main(timetable_specs: dict, input_path: str):
+    global materii, sali, profesori, zile, intervale
 
-def hca_main(timetable_specs: dict, input_file: str):
-    global materii, profesori, sali, intervale, zile
+    materii = {}
+    for materie in timetable_specs[utils.MATERII]:
+        materii[materie] = Materie(materie, timetable_specs[utils.MATERII][materie])
 
-    zile = timetable_specs[utils.ZILE]
+    sali = {}
+    for sala in timetable_specs[utils.SALI]:
+        sali[sala] = Sala(sala,\
+                            timetable_specs[utils.SALI][sala][utils.CAPACITATE],\
+                            timetable_specs[utils.SALI][sala][utils.MATERII])
 
-    materii = []
-    for materie, capacitate in timetable_specs[utils.MATERII].items():
-        materii.append(Materie(materie, capacitate))
-
-    profesori = []
-    for profesor, val in timetable_specs[utils.PROFESORI].items():
-        profesori.append(Profesor(profesor, val[utils.MATERII], val[utils.CONSTRANGERI]))
-
-    sali = []
-    for sala, val in timetable_specs[utils.SALI].items():
-        sali.append(Sala(sala, val[utils.CAPACITATE], val[utils.MATERII]))
-
-    intervale = []
+    profesori = {}
+    for profesor in timetable_specs[utils.PROFESORI]:
+        profesori[profesor] = Profesor(profesor,\
+                        timetable_specs[utils.PROFESORI][profesor][utils.MATERII],\
+                        timetable_specs[utils.PROFESORI][profesor][utils.CONSTRANGERI])
+        
+    intervale = {}
     for interval in timetable_specs[utils.INTERVALE]:
-        intervale.append(Interval(interval))
-
-
-def hill_climbing(initial: State, max_iters: int = 1000):
-    iters, states = 0, 0
-    state = initial.clone()
-    minim = state.get_conflicts()
-    
-    while iters < max_iters:
-        iters += 1
-        minim = state.get_conflicts()
-
-        if state.is_final():
-            break
+        intervale[interval] = Interval(interval)
         
-        not_found = True
-
-        for neigh in list(state.get_next_states()):
-            confls = neigh.get_conflicts()
-            states += 1
-
-            if minim > confls:
-                minim = confls
-                state = neigh
-                not_found = False
-
-        if not_found:
-            break
+    zile = timetable_specs[utils.ZILE]
         
-    return state.is_final(), iters, states, state
+    state = State()
+
+    print(utils.pretty_print_timetable(state.get_orar(), input_path))
