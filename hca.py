@@ -78,13 +78,13 @@ class Sala:
 class State:
     def __init__(self, orar: dict=None):
         if orar is None:
-            self.orar = self.create_empty_orar()
+            self.orar = self.create_first_state()
         else:
             self.orar = orar
 
         self.compute_conflicts()
 
-    def create_empty_orar(self):
+    def create_first_state(self):
         orar = {}
 
         for zi in zile:
@@ -205,7 +205,7 @@ class State:
                 curr_profesori.append(profesor)
 
         for materie in curr_materii:
-            for profesor in profesori:
+            for profesor in curr_profesori:
                 zile_preferate = []
                 for zi in zile:
                     if zi in profesor.constrangeri:
@@ -250,7 +250,7 @@ def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
     
     while iters < max_iters:
         iters += 1
-        minim = state.get_conflicts()
+        minim = 3 * state.get_conflicts()[0] + state.get_conflicts()[1]
 
         if state.is_final():
             break
@@ -259,10 +259,12 @@ def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
 
         for neigh in list(state.get_next_states()):
             confls = neigh.get_conflicts()
+            sum = 3 * confls[0] + confls[1]
             states += 1
 
-            if confls[0] < minim[0] or (confls[0] <= minim[0] and confls[1] < minim[1]) or (confls[0] == len(materii) and confls[1] == 0):
-                minim = confls
+            if sum <= minim:
+            # if confls[1] < minim[1]:
+                minim = sum
                 state = neigh
                 not_found = False
                 # break
@@ -304,7 +306,7 @@ def random_restart_hill_climbing(
 
     while restarts < max_restarts:
         print(restarts)
-        is_final, iters, states, state = stochastic_hill_climbing(state, run_max_iters)
+        is_final, iters, states, state = first_choice_hill_climbing(state, run_max_iters)
 
         total_iters += iters
         total_states += states
@@ -348,7 +350,7 @@ def hca_main(timetable_specs: dict, input_path: str):
         
     zile = timetable_specs[utils.ZILE]
         
-    _, _, _, state = random_restart_hill_climbing(State())
+    _, _, _, state = first_choice_hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
     print(state.hard_conflicts, state.soft_conflicts)
     print(timetable)
