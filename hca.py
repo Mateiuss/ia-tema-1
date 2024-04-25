@@ -12,7 +12,7 @@ class Interval:
         return self.start, self.end
     
     def __str__(self) -> str:
-        return '(' + str(self.start) + ', ' + str(self.end) + ')'
+        return str(self.start) + '-' + str(self.end)
 
 class Materie:
     def __init__(self, name: str, capacitate: int):
@@ -194,11 +194,34 @@ class State:
         Generator function that yields all possible states that can be reached
         from the current state
         """
-
+        curr_materii = []
         for materie in materii:
+            if self.materie_acoperire[materie.get_name()] < materie.get_capacitate():
+                curr_materii.append(materie)
+
+        curr_profesori = []
+        for profesor in profesori:
+            if self.profesor_ore_predate[profesor.get_name()] < 7:
+                curr_profesori.append(profesor)
+
+        for materie in curr_materii:
             for profesor in profesori:
+                zile_preferate = []
                 for zi in zile:
-                    for interval in intervale:
+                    if zi in profesor.constrangeri:
+                        zile_preferate.append(zi)
+                    else:
+                        zile_preferate.insert(0, zi)
+
+                intervale_preferate = []
+                for interval in intervale:
+                    if str(interval) in profesor.constrangeri:
+                        intervale_preferate.append(interval)
+                    else:
+                        intervale_preferate.insert(0, interval)
+
+                for zi in zile_preferate:
+                    for interval in intervale_preferate:
                         if interval.get_interval() in self.profesor_zi_interval[profesor.get_name()][zi]:
                             continue
 
@@ -228,7 +251,6 @@ def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
     while iters < max_iters:
         iters += 1
         minim = state.get_conflicts()
-        minim = minim[0] + minim[1]
 
         if state.is_final():
             break
@@ -237,14 +259,13 @@ def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
 
         for neigh in list(state.get_next_states()):
             confls = neigh.get_conflicts()
-            sum = confls[0] + confls[1]
             states += 1
 
-            if minim > sum or (confls[0] == len(materii) and confls[1] == 0):
-                minim = sum
+            if confls[0] < minim[0] or (confls[0] <= minim[0] and confls[1] < minim[1]) or (confls[0] == len(materii) and confls[1] == 0):
+                minim = confls
                 state = neigh
                 not_found = False
-                break
+                # break
 
         if not_found:
             break
@@ -269,6 +290,32 @@ def stochastic_hill_climbing(initial: State, max_iters: int = 1000):
         state = random.choice(lista)
 
     return state.is_final(), iters, states, state
+
+def random_restart_hill_climbing(
+    initial: State,
+    max_restarts: int = 100, 
+    run_max_iters: int = 100, 
+):
+    
+    total_iters, total_states = 0, 0
+    
+    state = initial
+    restarts = 0
+
+    while restarts < max_restarts:
+        print(restarts)
+        is_final, iters, states, state = stochastic_hill_climbing(state, run_max_iters)
+
+        total_iters += iters
+        total_states += states
+
+        if is_final:
+            break
+        else:
+            state = State()
+            restarts += 1
+    
+    return is_final, total_iters, total_states, state
 
 def hca_main(timetable_specs: dict, input_path: str):
     global materii, sali, profesori, zile, intervale
@@ -301,7 +348,7 @@ def hca_main(timetable_specs: dict, input_path: str):
         
     zile = timetable_specs[utils.ZILE]
         
-    _, _, _, state = stochastic_hill_climbing(State())
+    _, _, _, state = random_restart_hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
     print(state.hard_conflicts, state.soft_conflicts)
     print(timetable)
