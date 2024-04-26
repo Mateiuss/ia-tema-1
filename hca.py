@@ -206,13 +206,20 @@ class State:
 
         for materie in curr_materii:
             for profesor in curr_profesori:
+                if not profesor.in_materii(materie.get_name()):
+                    continue
+
+                # heurisitc for ordering the days
                 zile_preferate = []
+                # last_zi_preferata = 0
                 for zi in zile:
                     if zi in profesor.constrangeri:
                         zile_preferate.append(zi)
                     else:
                         zile_preferate.insert(0, zi)
+                        # last_zi_preferata += 1
 
+                # heurisitc for ordering the intervals
                 intervale_preferate = []
                 for interval in intervale:
                     if str(interval) in profesor.constrangeri:
@@ -232,9 +239,6 @@ class State:
                             if not sala.in_materii(materie.get_name()):
                                 continue
 
-                            if not profesor.in_materii(materie.get_name()):
-                                continue
-
                             yield self.apply_move((profesor.get_name(), materie.get_name()),\
                                                   (zi, interval.get_interval(), sala.get_name()))
                                 
@@ -244,13 +248,13 @@ class State:
     def clone(self):
         return State(deepcopy(self.orar))
     
-def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
+def hill_climbing(initial: State, max_iters: int = 1000):
     iters, states = 0, 0
     state = initial.clone()
     
     while iters < max_iters:
         iters += 1
-        minim = 3 * state.get_conflicts()[0] + state.get_conflicts()[1]
+        hard_conflicts, soft_conflicts = state.get_conflicts()
 
         if state.is_final():
             break
@@ -258,66 +262,19 @@ def first_choice_hill_climbing(initial: State, max_iters: int = 1000):
         not_found = True
 
         for neigh in list(state.get_next_states()):
-            confls = neigh.get_conflicts()
-            sum = 3 * confls[0] + confls[1]
-            states += 1
+            neigh_hard_conflicts, neigh_soft_conflicts = neigh.get_conflicts()
 
-            if sum <= minim:
-            # if confls[1] < minim[1]:
-                minim = sum
+            # Prioritize based on hard constraints first
+            if neigh_hard_conflicts < hard_conflicts or (neigh_hard_conflicts == hard_conflicts and neigh_soft_conflicts <= soft_conflicts):
+                hard_conflicts = neigh_hard_conflicts
+                soft_conflicts = neigh_soft_conflicts
                 state = neigh
                 not_found = False
-                # break
 
         if not_found:
             break
         
     return state.is_final(), iters, states, state
-
-def stochastic_hill_climbing(initial: State, max_iters: int = 1000):
-    iters, states = 0, 0
-    state = initial
-    
-    while iters < max_iters:
-        iters += 1
-        state_conflicts = state.get_conflicts()
-        state_conflicts = state_conflicts[0] + state_conflicts[1]
-
-        lista = [x for x in list(state.get_next_states())\
-                  if state_conflicts >= x.get_conflicts()[0] + x.get_conflicts()[1]]
-
-        if len(lista) == 0 or state.is_final():
-            break
-
-        state = random.choice(lista)
-
-    return state.is_final(), iters, states, state
-
-def random_restart_hill_climbing(
-    initial: State,
-    max_restarts: int = 100, 
-    run_max_iters: int = 100, 
-):
-    
-    total_iters, total_states = 0, 0
-    
-    state = initial
-    restarts = 0
-
-    while restarts < max_restarts:
-        print(restarts)
-        is_final, iters, states, state = first_choice_hill_climbing(state, run_max_iters)
-
-        total_iters += iters
-        total_states += states
-
-        if is_final:
-            break
-        else:
-            state = State()
-            restarts += 1
-    
-    return is_final, total_iters, total_states, state
 
 def hca_main(timetable_specs: dict, input_path: str):
     global materii, sali, profesori, zile, intervale
@@ -326,7 +283,7 @@ def hca_main(timetable_specs: dict, input_path: str):
     for materie in timetable_specs[utils.MATERII]:
         materii.append(Materie(materie, timetable_specs[utils.MATERII][materie]))
     # sort by capacity in descending order (materii is a list)
-    materii.sort(key=lambda x: x.get_capacitate(), reverse=True)
+    # materii.sort(key=lambda x: x.get_capacitate(), reverse=True)
 
     sali = []
     for sala in timetable_specs[utils.SALI]:
@@ -334,7 +291,7 @@ def hca_main(timetable_specs: dict, input_path: str):
                             timetable_specs[utils.SALI][sala][utils.CAPACITATE],\
                             timetable_specs[utils.SALI][sala][utils.MATERII]))
     # sort by least number of materii in descending order and after that by capacity in descending order
-    sali.sort(key=lambda x: (len(x.materii), x.get_capacitate()), reverse=True)
+    sali.sort(key=lambda x: (-len(x.materii), x.get_capacitate()), reverse=True)
 
     profesori = []
     for profesor in timetable_specs[utils.PROFESORI]:
@@ -349,8 +306,19 @@ def hca_main(timetable_specs: dict, input_path: str):
         intervale.append(Interval(interval))
         
     zile = timetable_specs[utils.ZILE]
+
+    materie_nr_profesori = {}
+    for materie in materii:
+        materie_nr_profesori[materie.get_name()] = 0
+
+    for profesor in profesori:
+        for materie in profesor.materii:
+            materie_nr_profesori[materie] += 1
+
+    # sort materii by number of profesori in ascending order and after that by capacity in descending order
+    materii.sort(key=lambda x: (-materie_nr_profesori[x.get_name()], x.get_capacitate()), reverse=True)
         
-    _, _, _, state = first_choice_hill_climbing(State())
+    _, _, _, state = hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
     print(state.hard_conflicts, state.soft_conflicts)
     print(timetable)
