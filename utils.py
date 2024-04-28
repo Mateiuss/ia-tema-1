@@ -1,6 +1,4 @@
 import yaml
-import argparse
-import sys
 
 ##################### MACROURI #####################
 INTERVALE = 'Intervale'
@@ -91,7 +89,7 @@ def allign_string_with_spaces(s : str, max_len : int, allignment_type : str = 'c
     return s
 
 
-def pretty_print_timetable_aux_zile(timetable : {str : {(int, int) : {str : (str, str)}}}, input_path : str) -> str:
+def pretty_print_timetable_aux_zile(timetable : dict[str, dict[tuple[int, int], dict[str, tuple[str, str]]]], input_path : str) -> str:
     '''
     Primește un dicționar ce are chei zilele, cu valori dicționare de intervale reprezentate ca tupluri de int-uri, cu valori dicționare de săli, cu valori tupluri (profesor, materie)
 
@@ -139,7 +137,7 @@ def pretty_print_timetable_aux_zile(timetable : {str : {(int, int) : {str : (str
 
     return table_str
 
-def pretty_print_timetable_aux_intervale(timetable : {(int, int) : {str : {str : (str, str)}}}, input_path : str) -> str:
+def pretty_print_timetable_aux_intervale(timetable : dict[tuple[int, int], dict[str, dict[str, tuple[str, str]]]], input_path : str) -> str:
     '''
     Primește un dicționar de intervale reprezentate ca tupluri de int-uri, cu valori dicționare de zile, cu valori dicționare de săli, cu valori tupluri (profesor, materie)
 

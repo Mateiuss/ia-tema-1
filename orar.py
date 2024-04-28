@@ -9,6 +9,8 @@ if __name__ == '__main__':
         print('Usage: python orar.py <method> <input_file>')
         exit(1)
 
+    print('Note: The output will be saved in my_outputs/ directory')
+
     method = sys.argv[1]
     input_file = sys.argv[2]
 
