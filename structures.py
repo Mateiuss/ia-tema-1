@@ -16,9 +16,16 @@ class Materie:
     def __init__(self, name: str, capacitate: int):
         self.name = name
         self.capacitate = capacitate
+        self.acoperire = 0
 
     def get_capacitate(self) -> int:
         return self.capacitate
+    
+    def get_acoperire(self) -> int:
+        return self.acoperire
+    
+    def is_full(self) -> bool:
+        return self.acoperire >= self.capacitate
     
     def get_name(self) -> str:
         return self.name
@@ -42,9 +49,13 @@ class Profesor:
                 new_constrangeri.append(constrangere)
 
         self.constrangeri = new_constrangeri
+        self.acoperire = 0
 
     def get_name(self) -> str:
         return self.name
+    
+    def is_full(self) -> bool:
+        return self.acoperire == 7
     
     def in_materii(self, materie: str) -> bool:
         return materie in self.materii
@@ -188,10 +199,6 @@ class State:
         return State(new_orar)
     
     def get_next_states(self):
-        """
-        Generator function that yields all possible states that can be reached
-        from the current state
-        """
         curr_materii = []
         for materie in State.materii:
             if self.materie_acoperire[materie.get_name()] < materie.get_capacitate():

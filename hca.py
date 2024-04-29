@@ -85,10 +85,11 @@ def hca_main(timetable_specs: dict, input_path: str):
 
     _, _, _, state = hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
+    print(timetable)
 
-    if not os.path.exists('my_outputs'):
-        os.makedirs('my_outputs')
+    # if not os.path.exists('my_outputs'):
+    #     os.makedirs('my_outputs')
 
-    output_path = input_path.replace('inputs', 'my_outputs').replace('.yaml', '.txt')
-    with open(output_path, 'w') as f:
-        f.write(timetable)
+    # output_path = input_path.replace('inputs', 'my_outputs').replace('.yaml', '.txt')
+    # with open(output_path, 'w') as f:
+    #     f.write(timetable)
