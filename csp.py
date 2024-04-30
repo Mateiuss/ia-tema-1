@@ -1,31 +1,7 @@
-from copy import deepcopy, copy
 from structures import Materie, Profesor, Sala, Interval, State
 import utils
 import os
-
-def get_constraints(var, constraints):
-    return [x for x in constraints if var in x[0]]
-
-def fixed_constraints(solution, constraints):
-    ans = []
-
-    # print(f'Solution: {solution}')
-    for constraint in constraints:
-        ok = True
-
-        for var in constraint[0]:
-            # print(f'Var: {var}')
-            if var not in solution:
-                ok = False
-                break
-
-        if ok == True:
-            ans.append(constraint)
-
-    return ans
-
-def check_constraint(solution, constraint):
-    return constraint[1](*[y for x, y in solution.items() if x in constraint[0]])
+import random
 
 def materii_acoperite():
     for materie in materii:
@@ -34,61 +10,24 @@ def materii_acoperite():
         
     return True
 
-def profesor_acelasi_interval(*argv):
-    constrangeri = 0
-
-    profesori_folositi = set()
-    for arg in argv:
-        if arg is None:
+def profesor_acelasi_interval(zi, interval, profesor, solution):
+    for var, val in solution.items():
+        if val is None:
             continue
 
-        profesor, _ = arg
-        if profesor in profesori_folositi:
-            constrangeri += 1
-        else:
-            profesori_folositi.add(profesor)
+        zi_, interval_, _ = var
+        profesor_, _ = val
 
-    return constrangeri
+        if zi_ == zi and interval_ == interval and profesor_ == profesor:
+            return True
+        
+    return False
 
-def preferinte_profesori(zi, interval, val):
-    if val is None:
-        return 0
-
-    profesor, _ = val
-    constrangeri = 0
-
-    if zi in profesor_to_obj[profesor].constrangeri:
-        constrangeri += 1
-
-    if str(interval) in profesor_to_obj[profesor].constrangeri:
-        constrangeri += 1
-
-    return constrangeri
-
-def create_constraints(vars:list[tuple]) -> list[tuple]:
-    constraints = []
-
-    # Constrangeri hard
-    for zi in zile:
-        for interval in intervale:
-            vars_for_constraint = [(zi, interval.get_interval(), sala.get_name()) for sala in sali]
-            constraints.append((vars_for_constraint, lambda *x: profesor_acelasi_interval(*x)))
-
-    # Constrangeri soft
-    for zi in zile:
-        for interval in intervale:
-            for sala in sali:
-                tmp_lambda = lambda x, y: lambda z: preferinte_profesori(x, y, z)
-                lambda_func = tmp_lambda(zi, interval)
-                constraints.append(([(zi, interval.get_interval(), sala.get_name())], lambda_func))
-
-    return constraints
-
-def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
+def PCSP(vars, domains, acceptable_cost, solution, cost):
     global best_solution
     global best_cost
     global iterations
-    if best_cost == 0:
+    if best_cost == acceptable_cost:
         return True
     if not vars:
         # print("New best: " + str(cost) + " - " + str(solution))
@@ -107,8 +46,11 @@ def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
         var = vars[0]
 
         for val in domains[var]:
-            if best_cost == 0:
+            if best_cost == acceptable_cost:
                 return True
+            
+            zi, interval, sala = var
+            delta_cost = 0
             
             if val is not None:
                 profesor, materie = val
@@ -118,26 +60,27 @@ def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
 
                 if profesor_to_obj[profesor].acoperire >= 7:
                     continue
-            _, _, sala = var
 
-            if val is not None:
+                if profesor_acelasi_interval(zi, interval, profesor, solution):
+                    continue
+
                 profesor_to_obj[profesor].acoperire += 1
                 materie_to_obj[materie].acoperire += sala_to_obj[sala].capacitate
 
-            new_solution = solution
-            new_solution[var] = val
+                if zi in profesor_to_obj[profesor].constrangeri:
+                    delta_cost += 1
 
-            new_constraints = fixed_constraints(new_solution, constraints)
+                if str(Interval(str(interval))) in profesor_to_obj[profesor].constrangeri:
+                    delta_cost += 1
 
-            new_cost = 0
-            for constraint in new_constraints:
-                new_cost += check_constraint(new_solution, constraint)
+            solution[var] = val
+            new_cost = cost + delta_cost
 
             if new_cost < best_cost and new_cost <= acceptable_cost:
-                if PCSP(vars[1:], domains, constraints, acceptable_cost, new_solution, new_cost):
+                if PCSP(vars[1:], domains, acceptable_cost, solution, new_cost):
                     return True
                 
-            new_solution.pop(var)
+            solution.pop(var)
                 
             if val is not None:
                 profesor_to_obj[profesor].acoperire -= 1
@@ -166,6 +109,7 @@ def create_domains(vars:list[tuple]) -> dict:
                     domains[var].append((profesor.get_name(), materie.get_name()))
 
         domains[var].append(None)
+        # random.shuffle(domains[var])
 
     return domains
 
@@ -186,6 +130,7 @@ def csp_main(timetable_specs: dict, input_path: str):
                             timetable_specs[utils.SALI][sala][utils.CAPACITATE],\
                             timetable_specs[utils.SALI][sala][utils.MATERII]))
         sala_to_obj[sala] = sali[-1]
+    # sali.sort(key=lambda x: (-len(x.materii), x.get_capacitate()), reverse=True)
         
     profesori = []
     profesor_to_obj = {}
@@ -194,6 +139,7 @@ def csp_main(timetable_specs: dict, input_path: str):
                         timetable_specs[utils.PROFESORI][profesor][utils.MATERII],\
                         timetable_specs[utils.PROFESORI][profesor][utils.CONSTRANGERI]))
         profesor_to_obj[profesor] = profesori[-1]
+    # profesori.sort(key=lambda x: len(x.materii))
         
     intervale = []
     interval_to_obj = {}
@@ -219,7 +165,6 @@ def csp_main(timetable_specs: dict, input_path: str):
 
     vars = create_vars()
     domains = create_domains(vars)
-    constraints = create_constraints(vars)
 
     global best_solution
     global best_cost
@@ -229,7 +174,7 @@ def csp_main(timetable_specs: dict, input_path: str):
     iterations = 0
     acceptable_cost = 0
 
-    PCSP(vars, domains, constraints, acceptable_cost, {}, 0)
+    PCSP(vars, domains, acceptable_cost, {}, 0)
 
     for var, val in best_solution.items():
         zi, interval, sala = var
@@ -238,8 +183,7 @@ def csp_main(timetable_specs: dict, input_path: str):
             orar[zi][interval][sala] = (profesor, materie)
 
     state = State(orar)
-    print(state.hard_conflicts, state.soft_conflicts)
-    print(best_cost, iterations)
+    print(f'Hard constraints: {state.hard_conflicts}\nSoft constraints: {state.soft_conflicts}\n')
 
     timetable = utils.pretty_print_timetable(orar, input_path)
     print(timetable)

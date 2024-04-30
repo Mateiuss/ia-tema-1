@@ -20,10 +20,8 @@ if __name__ == '__main__':
         exit(1)
 
     if method == 'hc':
-        print('Note: The output will be saved in my_outputs/ directory')
         hca.hca_main(timetable_specs, input_file)
     elif method == 'csp':
-        print('Note: The output will be saved in my_outputs/ directory')
         csp.csp_main(timetable_specs, input_file)
     else:
         print('Invalid method')

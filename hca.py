@@ -85,6 +85,8 @@ def hca_main(timetable_specs: dict, input_path: str):
 
     _, _, _, state = hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
+    
+    print(f'Hard constraints: {state.hard_conflicts}\nSoft constraints: {state.soft_conflicts}\n')
     print(timetable)
 
     if not os.path.exists('my_outputs'):
