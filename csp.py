@@ -27,95 +27,19 @@ def fixed_constraints(solution, constraints):
 def check_constraint(solution, constraint):
     return constraint[1](*[y for x, y in solution.items() if x in constraint[0]])
 
-def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
-    global best_solution
-    global best_cost
-    global iterations
-    # print(len(vars))
-    if not vars:
-        print("New best: " + str(cost) + " - " + str(solution))
-        best_solution = solution
-        best_cost = cost
-        if acceptable_cost >= cost:
-            return True
-    elif not domains[vars[0]]:
-        return False
-    elif cost == best_cost:
-        return False
-    else:
-        var = vars[0]
-        val = domains[var].pop(0)
-        iterations += 1
-        if val is not None:
-            profesor, materie = val
-        _, _, sala = var
-
-        if val is not None:
-            profesor_to_obj[profesor].acoperire += 1
-            materie_to_obj[materie].acoperire += sala_to_obj[sala].capacitate
-
-        new_solution = copy(solution)
-        new_solution[var] = val
-
-        new_constraints = fixed_constraints(new_solution, constraints)
-
-        new_cost = 0
-        for constraint in new_constraints:
-            new_cost += check_constraint(new_solution, constraint)
-
-        if new_cost < best_cost and new_cost <= acceptable_cost:
-            if PCSP(vars[1:], domains, constraints, acceptable_cost, new_solution, new_cost) == True:
-                return True
-            
-        if val is not None:
-            profesor_to_obj[profesor].acoperire -= 1
-            materie_to_obj[materie].acoperire -= sala_to_obj[sala].capacitate
-
-        return PCSP(vars, deepcopy(domains), constraints, acceptable_cost, solution, cost)
-    
-def create_vars() -> list[tuple]:
-    vars = []
-    for zi in zile:
-        for interval in intervale:
-            for sala in sali:
-                vars.append((zi, interval.get_interval(), sala.get_name()))
-
-    return vars
-
-def create_domains(vars:list[tuple]) -> dict:
-    domains = {}
-    for var in vars:
-        _, _, sala = var
-        domains[var] = []
-        for materie in materii:
-            if materie.name not in sala_to_obj[sala].materii:
-                continue
-
-            for profesor in profesori:
-                if materie.name in profesor.materii:
-                    domains[var].append((profesor.get_name(), materie.get_name()))
-
-        domains[var].append(None)
-
-    return domains
-
 def materii_acoperite():
-    constrangeri = 0
-
     for materie in materii:
         if not materie.is_full():
-            constrangeri += 1
-
-    return constrangeri
-
+            return False
+        
+    return True
+        
 def profesori_acoperiti():
-    constrangeri = 0
-
     for profesor in profesori:
         if profesor.acoperire > 7:
-            constrangeri += 1
+            return False
 
-    return constrangeri
+    return True
 
 def profesor_acelasi_interval(*argv):
     constrangeri = 0
@@ -150,23 +74,8 @@ def preferinte_profesori(zi, interval, val):
 
 def create_constraints(vars:list[tuple]) -> list[tuple]:
     constraints = []
-    
-    """
-    • într-un interval orar, un profesor poate tine o singură materie, într-o singură
-    sală.
-
-    • un profesor poate tine ore în maxim 7 intervale pe săptămână.
-
-    • toti studentii de la o materie trebuie să aibă alocate ore la acea materie.
-    Concret, suma capacitătilor sălilor peste toate intervalele în care se tin ore la
-    materia respectivă trebuie să fie mai mare sau egală decât numărul de studenti
-    la materia respectivă
-    """
 
     # Constrangeri hard
-    constraints.append((vars, lambda *x: materii_acoperite()))
-    constraints.append((vars, lambda *x: profesori_acoperiti()))
-
     for zi in zile:
         for interval in intervale:
             vars_for_constraint = [(zi, interval.get_interval(), sala.get_name()) for sala in sali]
@@ -181,6 +90,97 @@ def create_constraints(vars:list[tuple]) -> list[tuple]:
                 constraints.append(([(zi, interval.get_interval(), sala.get_name())], lambda_func))
 
     return constraints
+
+def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
+    global best_solution
+    global best_cost
+    global iterations
+    if best_cost == 0:
+        return True
+    if not vars:
+        # print("New best: " + str(cost) + " - " + str(solution))
+        if not materii_acoperite():
+            return False
+
+        best_solution = solution
+        best_cost = cost
+        if acceptable_cost >= cost:
+            return True
+    elif not domains[vars[0]]:
+        return False
+    elif cost == best_cost:
+        return False
+    else:
+        var = vars[0]
+
+        for val in domains[var]:
+            if best_cost == 0:
+                return True
+            
+            if val is not None:
+                profesor, materie = val
+                
+                if materie_to_obj[materie].is_full():
+                    continue
+
+                if profesor_to_obj[profesor].acoperire >= 7:
+                    continue
+            _, _, sala = var
+
+            if val is not None:
+                profesor_to_obj[profesor].acoperire += 1
+                materie_to_obj[materie].acoperire += sala_to_obj[sala].capacitate
+
+            if not profesori_acoperiti():
+                if val is not None:
+                    profesor_to_obj[profesor].acoperire -= 1
+                    materie_to_obj[materie].acoperire -= sala_to_obj[sala].capacitate
+                continue
+
+            new_solution = solution
+            new_solution[var] = val
+
+            new_constraints = fixed_constraints(new_solution, constraints)
+
+            new_cost = 0
+            for constraint in new_constraints:
+                new_cost += check_constraint(new_solution, constraint)
+
+            if new_cost < best_cost and new_cost <= acceptable_cost:
+                if PCSP(vars[1:], domains, constraints, acceptable_cost, new_solution, new_cost):
+                    return True
+                
+            new_solution.pop(var)
+                
+            if val is not None:
+                profesor_to_obj[profesor].acoperire -= 1
+                materie_to_obj[materie].acoperire -= sala_to_obj[sala].capacitate
+    
+def create_vars() -> list[tuple]:
+    vars = []
+    for zi in zile:
+        for interval in intervale:
+            for sala in sali:
+                vars.append((zi, interval.get_interval(), sala.get_name()))
+
+    return vars
+
+def create_domains(vars:list[tuple]) -> dict:
+    domains = {}
+    for var in vars:
+        _, _, sala = var
+        domains[var] = []
+        for materie in materii:
+            if materie.name not in sala_to_obj[sala].materii:
+                continue
+
+            for profesor in profesori:
+                if materie.name in profesor.materii:
+                    domains[var].append((profesor.get_name(), materie.get_name()))
+
+        domains[var].append(None)
+
+    return domains
 
 def csp_main(timetable_specs: dict, input_path: str):
     global interval_to_obj, materie_to_obj, profesor_to_obj, sala_to_obj
@@ -238,11 +238,11 @@ def csp_main(timetable_specs: dict, input_path: str):
     global best_cost
     global iterations
     best_solution = {}
-    best_cost = 10000000
+    best_cost = 100000
     iterations = 0
     acceptable_cost = 0
 
-    PCSP(vars, copy(domains), constraints, acceptable_cost, {}, 0)
+    PCSP(vars, domains, constraints, acceptable_cost, {}, 0)
 
     for var, val in best_solution.items():
         zi, interval, sala = var
