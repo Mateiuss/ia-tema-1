@@ -3,7 +3,7 @@ import sys
 
 def run_test(file_name, method):
     print(f"Running test for {file_name}")
-    os.system(f"python3 orar.py {method} inputs/{file_name}.yaml")
+    os.system(f"time python3 orar.py {method} inputs/{file_name}.yaml")
     os.system(f"python3 check_constraints.py {file_name}")
     os.system(f"rm -rf my_outputs/{file_name}.txt")
 

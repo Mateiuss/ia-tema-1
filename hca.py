@@ -17,10 +17,9 @@ def hill_climbing(initial: State, max_iters: int = 1000):
         min_state = None
 
         for neigh in list(state.get_next_states()):
-            # print(f'Neighbor state: {neigh.get_conflicts()}')
+            states += 1
             neigh_hard_conflicts, neigh_soft_conflicts = neigh.get_conflicts()
 
-            # Prioritize based on hard constraints first
             if neigh_hard_conflicts < hard_conflicts\
                   or (neigh_hard_conflicts == hard_conflicts and neigh_soft_conflicts <= soft_conflicts):
                 hard_conflicts = neigh_hard_conflicts
@@ -83,15 +82,10 @@ def hca_main(timetable_specs: dict, input_path: str):
     State.intervale = intervale
     State.zile = zile
 
-    _, _, _, state = hill_climbing(State())
+    _, _, states, state = hill_climbing(State())
     timetable = utils.pretty_print_timetable(state.get_orar(), input_path)
     
     print(f'Hard constraints: {state.hard_conflicts}\nSoft constraints: {state.soft_conflicts}\n')
+    print(f'Number of generated states: {states}')
     print(timetable)
 
-    if not os.path.exists('my_outputs'):
-        os.makedirs('my_outputs')
-
-    output_path = input_path.replace('inputs', 'my_outputs').replace('.yaml', '.txt')
-    with open(output_path, 'w') as f:
-        f.write(timetable)
