@@ -33,13 +33,6 @@ def materii_acoperite():
             return False
         
     return True
-        
-def profesori_acoperiti():
-    for profesor in profesori:
-        if profesor.acoperire > 7:
-            return False
-
-    return True
 
 def profesor_acelasi_interval(*argv):
     constrangeri = 0
@@ -130,12 +123,6 @@ def PCSP(vars, domains, constraints, acceptable_cost, solution, cost):
             if val is not None:
                 profesor_to_obj[profesor].acoperire += 1
                 materie_to_obj[materie].acoperire += sala_to_obj[sala].capacitate
-
-            if not profesori_acoperiti():
-                if val is not None:
-                    profesor_to_obj[profesor].acoperire -= 1
-                    materie_to_obj[materie].acoperire -= sala_to_obj[sala].capacitate
-                continue
 
             new_solution = solution
             new_solution[var] = val
